@@ -1,0 +1,6 @@
+README.md
+setup.py
+RTeresiOB.egg-info/PKG-INFO
+RTeresiOB.egg-info/SOURCES.txt
+RTeresiOB.egg-info/dependency_links.txt
+RTeresiOB.egg-info/top_level.txt
