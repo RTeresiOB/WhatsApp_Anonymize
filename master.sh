@@ -18,8 +18,8 @@
 #
 #########################################
 
-{ # try
 
+{ # Check if python 3.x installed
 py2or3="$(python -c 'import sys; print(sys.version_info[0])')" &&
 pyv="$(python -c 'import sys; print(sys.version_info[1])')"
 
@@ -29,8 +29,9 @@ else
 echo "Need To install Python 3"
 fi
 
-} || { # catch
-# save log for exception
+} || { # Install Python 3.7.7
+chmod +x ./python377_local_install.sh
+./python377_local_install.sh
 }
 
 if ["$1" = "y"]; then
@@ -43,3 +44,4 @@ while [ x = 0 ]
 do
 printf " No valid option selected. \n Please type in y to use previously-installed Python, n to use Python as installed by "
 fi
+
