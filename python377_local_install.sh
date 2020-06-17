@@ -14,7 +14,11 @@ else
 printf "$FILE does not exist \n Installing python3.7.7 into $FILE\n"
 # installing python 3.7.7
 mkdir -p ~/local
+{
 wget http://www.python.org/ftp/python/3.7.7/Python-3.7.7.tgz
+} || {
+curl -O http://www.python.org/ftp/python/3.7.7/Python-3.7.7.tgz
+}
 tar xvzf Python-3.7.7.tgz
 cd Python-3.7.7
 ./configure
