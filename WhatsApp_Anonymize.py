@@ -67,11 +67,20 @@ class Encryptor(object):
         public_key = private_key.public_key()
 
         pem = public_key.public_bytes(
-            encoding=serialization.Encoding.PEM,
-            format=serialization.PublicFormat.SubjectPublicKeyInfo
-        )
+                encoding=serialization.Encoding.PEM,
+                format=serialization.PublicFormat.SubjectPublicKeyInfo
+                )
 
         with open(Path(key_folder / 'public_key.pem'), 'wb') as file:
+            file.write(pem)
+
+        pem = private_key.private_bytes(
+                encoding=serialization.Encoding.PEM,
+                format=serialization.PrivateFormat.TraditionalOpenSSL,
+                encryption_algorithm=serialization.NoEncryption()
+                )
+
+        with open(Path(key_folder / 'private_key.pem'), 'wb') as file:
             file.write(pem)
 
     def load_public_key(self, key_folder):
@@ -79,6 +88,12 @@ class Encryptor(object):
         with open(Path(key_folder / 'public_key.pem'), 'rb') as file:
             self.public_key = serialization.load_pem_public_key(
                     file.read(),
+                    backend=default_backend()
+                    )
+        with open(Path(key_folder / 'private_key.pem'), "rb") as file:
+            self.private_key = serialization.load_pem_private_key(
+                    file.read(),
+                    password=None,
                     backend=default_backend()
                     )
 
@@ -93,6 +108,18 @@ class Encryptor(object):
                         label=None
                         )
                     )
+               )
+
+    def decrypt(self, encrypted_message):
+        """Decrypt encrypted message."""
+        return(self.private_key.decrypt(
+                            encrypted_message,
+                            padding.OAEP(
+                                mgf=padding.MGF1(algorithm=hashes.SHA256()),
+                                algorithm=hashes.SHA256(),
+                                label=None
+                                )
+                            )
                )
 
 
