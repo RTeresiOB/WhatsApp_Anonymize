@@ -52,13 +52,12 @@ class Encryptor(object):
             self.generate_public_key(key_folder)
             self.load_public_key(key_folder)
 
-    def generate_public_key(self, key_folder):
+    def generate_keys(self, key_folder):
         """
         Generate the public key and store it in a file.
 
         Only run this if there is no existing key.
         """
-        '''
         print("Generating key")
         private_key = rsa.generate_private_key(
             public_exponent=849745,
@@ -74,8 +73,6 @@ class Encryptor(object):
 
         with open(Path(key_folder / 'public_key.pem'), 'wb') as file:
             file.write(pem)
-        '''
-        pass
 
     def load_public_key(self, key_folder):
         """Attach public key to class from file."""
@@ -136,21 +133,39 @@ class TextParser(object):
 class WhatsAppText(object):
     """Class associated with a single Whatsapp message."""
 
-    message, sender, alias = None, None, None
+    msg, sender, alias = None, None, None
 
     def __init__(self, text, time):
         """Initialize the class."""
-        self.user_message = bool(re.search(r': ', text))
+        self.user_msg = bool(re.search(r': ', text))
         self.time_sent = time
-        if self.user_message:
+        if self.user_msg:
             if len(re.split(r': ', text)) > 2:
-                self.message = ': '.join(re.split(': ', text)[1:])
+                self.msg = ': '.join(re.split(': ', text)[1:])
             else:
-                self.message = re.split(': ', text)[1]
+                self.msg = self.preprocess_text(re.split(': ', text)[1])
 
             self.sender = re.split(': ', text)[0]
         else:
-            self.message = text
+            self.msg = text
+
+    def preprocess_text(self, text):
+        """Preprocess texts before putting them into Spacy model.
+
+        For now the only thing I really want to do is fix a quirk where the
+        format "Name- " thinks that Name- is one token.
+        """
+        print(text)
+        matches = re.findall(r'^([A-Z][a-z]+)\- |[\.\?\!] ([A-Z][a-z]+)\- ',
+                             text)
+        for match in matches:
+            for group in match:
+                # Match contains name and empty string
+                if group:
+                    text = re.sub((group + r'\- '),
+                                  (group + r' - '),
+                                  text)
+        return(text)
 
 
 class Entity_Recognizer:
@@ -294,23 +309,24 @@ class WhatsAppAnonymizer(object):
         # on all recognized entities.
         for j in range(0, 2):
             for i in range(len(self.textparser.WhatsAppTexts)):
-                x = self.textparser.WhatsAppTexts[i].message
-                self.textparser.WhatsAppTexts[i].message = (self.anonymizer.
-                                                            anonymize_text(x, j))
+                x = self.textparser.WhatsAppTexts[i].msg
+                self.textparser.WhatsAppTexts[i].msg = (self.anonymizer.
+                                                            anonymize_text(x,
+                                                                           j))
         #self.anonymizer.delete_entlist()
 
     def upload_file(self):
         """Create dataframe and upload it as a .csv."""
         textdf = pd.DataFrame(columns=['sender',
                                        'alias',
-                                       'message',
+                                       'msg',
                                        'time'])
         for text in self.textparser.WhatsAppTexts:
             self.create_alias(text.sender)
-            print(text.message)
+            print(text.msg)
             textdf = textdf.append({'sender': text.sender,
                                     'alias': self.aliasdict[text.sender],
-                                    'message': text.message,
+                                    'msg': text.msg,
                                     'time': text.time_sent},
                                    ignore_index=True)
         textdf.sort_values(by='time', ascending=False)
