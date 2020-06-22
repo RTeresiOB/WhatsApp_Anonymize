@@ -27,7 +27,7 @@ TEXT_PATH = Path(Path.home() /
                  'Dropbox/CoViD_ED_TF/WhatsApp Chat sample.txt')
 KEY_FOLDER = Path(Path.home() /
                   'Dropbox/CoViD_ED_TF/Public_Key/')
-DATA_FOLDER = Path(Path.home() /
+DATA_DIR = Path(Path.home() /
                    'Dropbox/CoViD_ED_TF/')
 
 
@@ -243,7 +243,7 @@ class Entity_Recognizer:
         """Anonymize text."""
         def obscure_phone_numbers(text):
             """Replace phone numbers with NUMBER."""
-            return(re.sub(r'\+1 \(\d{3}\) \d{3}\-\d{4}', "NUMBER", text))
+            return(re.sub(r'\+1 \(\d{3}\) \d{3}\-\d{4}', 'NUMBER', text))
 
         self.anontext = self.nlp(text)
         text2 = str(self.anontext.text)
@@ -273,7 +273,7 @@ class Entity_Recognizer:
                     reidx = len(text2) - textlen
             return(obscure_phone_numbers(text2))
         else:
-            raise ValueError("Enter either 0 or 1 as the iteration parameter.")
+            raise ValueError('Enter either 0 or 1 as the iteration parameter.')
 
     def delete_entlist(self):
         """Clear list so that names no longer exist."""
@@ -286,12 +286,12 @@ class WhatsAppAnonymizer(object):
     aliasdict = {}
     encryptdict = {}
 
-    def __init__(self, text_path, key_folder, data_folder):
+    def __init__(self, text_path, key_folder, data_dir):
         """Initialize class."""
         # Initialize paths needed
         self.text_path = text_path
         self.key_folder = key_folder
-        self.data_folder = data_folder
+        self.data_dir = data_dir
 
         # Initialize classes
         self.textparser = TextParser(path=text_path)
@@ -322,7 +322,7 @@ class WhatsAppAnonymizer(object):
             return(name)
 
         if encrypted_id is None:
-            self.aliasdict.update({encrypted_id: "Whatsapp"})
+            self.aliasdict.update({encrypted_id: 'Whatsapp'})
         elif encrypted_id in self.aliasdict.keys():
             pass
         else:
@@ -337,33 +337,81 @@ class WhatsAppAnonymizer(object):
                 x = self.textparser.WhatsAppTexts[i].msg
                 self.textparser.WhatsAppTexts[i].msg = (self.anonymizer.
                                                         anonymize_text(x, j))
-        #self.anonymizer.delete_entlist()
 
-    def upload_file(self):
-        """Create dataframe and upload it as a .csv."""
-        textdf = pd.DataFrame(columns=['sender',
-                                       'alias',
-                                       'msg',
-                                       'time'])
+    def upload_file(self, append=False):
+        """Create dataframe and upload it as a .csv.
+        
+        This will need some work. As of right not it won't do very well
+        appending texts that were sent at the same time as the last text of 
+        the last upload. I don't think this is a problem for my current use
+        case, but I will add it to the to-do list.
+        """
+        def append_row(self,text):
+            textdf.append({'sender': text.sender,
+                           'alias': self.aliasdict[text.sender],
+                           'msg': text.msg,
+                           'time': text.time_sent},
+                          ignore_index=True)
+
+        if append:
+            textdf = self.old_data
+        else:
+            textdf = pd.DataFrame(columns=['sender',
+                                           'alias',
+                                           'msg',
+                                           'time'])
+
         for text in self.textparser.WhatsAppTexts:
+            if append & 
+                    (text.time_sent <= self.old_data.iloc[-1]['time']):
+                continue
             self.create_alias(text.sender)
             print(text.msg)
-            textdf = textdf.append({'sender': text.sender,
-                                    'alias': self.aliasdict[text.sender],
-                                    'msg': text.msg,
-                                    'time': text.time_sent},
-                                   ignore_index=True)
-        textdf.sort_values(by='time', ascending=False)
-        textdf.to_csv(self.data_folder / "encrypted_whatsapp_messages.csv")
+            textdf = self.append_row(text)
+
+        textdf.to_csv(self.data_dir / 'encrypted_whatsapp_msgs.csv')
+
+        def append_file(self):
+            """Add to existing data if wanted."""
+            if os.path.exists(self.data_dir /
+                              'encrypted_whatsapp_msgs.csv'):
+                console_msg = ('You already have encrypted messages saved.\n'
+                               'Enter in 1 to overwrite the existing data\n'
+                               'Enter in 2 to append to the existing data\n'
+                               'Enter in 3 to exit without saving\n\n.')
+                print(console_msg)
+                response = int(input())
+                count = 0
+                while response not in [1, 2, 3]:
+                    if count > 2:
+                        print('Retries exceeded--script closing. '
+                              'Please report this if it is an error.')
+                        exit()
+                    print("It seems you have entered in an incorrect input.")
+                    print(console_msg)
+                    response = int(input())
+
+                if response == 3:
+                    exit()  # Exit the script without saving
+
+                elif response == 2:
+                    self.old_data = pd.read_csv(self.data_dir /
+                                                'encrypted_whatsapp_msgs.csv')
+                    self.upload_file(append=True)
+                else:
+                    # Overwrite by uploading_file directly
+                    self.upload_file()
+            else:
+                self.upload_file()
 
 
 def main():
     """Control execution of class functions."""
     global anonymizer
-    anonymizer = WhatsAppAnonymizer(TEXT_PATH, KEY_FOLDER, DATA_FOLDER)
+    anonymizer = WhatsAppAnonymizer(TEXT_PATH, KEY_FOLDER, DATA_DIR)
     anonymizer.encrypt_identities()
     anonymizer.anonymize_text_bodies()
-    anonymizer.upload_file()
+    anonymizer.append_file()
 
 
 if __name__ == '__main__':
