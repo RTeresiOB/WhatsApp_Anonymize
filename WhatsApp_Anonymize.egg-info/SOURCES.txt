@@ -5,4 +5,5 @@ WhatsApp_Anonymize/__init__.py
 WhatsApp_Anonymize.egg-info/PKG-INFO
 WhatsApp_Anonymize.egg-info/SOURCES.txt
 WhatsApp_Anonymize.egg-info/dependency_links.txt
+WhatsApp_Anonymize.egg-info/requires.txt
 WhatsApp_Anonymize.egg-info/top_level.txt

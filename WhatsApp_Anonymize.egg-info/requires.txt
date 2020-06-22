@@ -1,0 +1,6 @@
+pandas
+pathlib
+datetime
+spacy
+names
+cryptography
