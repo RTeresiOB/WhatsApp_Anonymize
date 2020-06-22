@@ -34,4 +34,4 @@ setuptools.setup(
 )
 
 # Now install spacy model
-call(['python','-m','spacy','download','en_core_web_sm'])
+#call(['python','-m','spacy','download','en_core_web_sm'])
