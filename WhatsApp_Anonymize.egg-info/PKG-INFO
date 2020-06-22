@@ -1,0 +1,14 @@
+Metadata-Version: 1.2
+Name: WhatsApp-Anonymize
+Version: 0.0.1
+Summary: Package to anonymize whatsapp messages.
+Home-page: UNKNOWN
+Author: Robert K Teresi
+Author-email: robert.teresi@yale.edu
+License: UNKNOWN
+Description: UNKNOWN
+Platform: UNKNOWN
+Classifier: Programming Language :: Python :: 3
+Classifier: License :: OSI Approved :: MIT License
+Classifier: Operating System :: OS Independent
+Requires-Python: >=3.0
