@@ -6,6 +6,7 @@ Setup script
 @author: RobertTeresi
 """
 import setuptools
+import sys
 from subprocess import call
 
 setuptools.setup(
@@ -16,7 +17,7 @@ setuptools.setup(
     description="Package to anonymize whatsapp messages.",
     #long_description= long_description,
     #long_description_content_type="text/markdown",
-    #url="https://github.com/pypa/sampleproject",
+    #url="https://github.com/RTeresiOB/WhatsApp_Anonymize",
     packages=setuptools.find_packages(),
     install_requires=[
                      'pandas',
@@ -34,4 +35,4 @@ setuptools.setup(
 )
 
 # Now install spacy model
-#call(['python','-m','spacy','download','en_core_web_sm'])
+call([sys.executable,'-m','spacy','download','en_core_web_sm'])
