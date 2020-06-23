@@ -205,10 +205,28 @@ class WhatsAppText(object):
 class Entity_Recognizer:
     """Replace indentifiers with anonymous tags/identities."""
 
-    def __init__(self):
-        """Initialize nlp engine."""
+    def __init__(self, encryptor):
+        """Initialize nlp model, list of known entities, and list of names."""
         self.nlp = spacy.load("en_core_web_sm")
-        self.entlist = list()
+
+        self.encryptor = encryptor
+
+        if os.path.exists((KEY_DIR / "entlist.pickle")):
+            try:
+                with open((KEY_DIR / "entlist.pickle"), 'rb') as file:
+                    file = pickle.load(file)
+                    if file:
+                        self.decrypt_entlist(file)
+                    else:
+                        self.entlist = list()
+                        print("List is empty!")
+            except EOFError:
+                print("Entlist empty.")
+                self.entlist = list()
+                pass
+        else:
+            self.entlist = list()
+
         self.names = list(pd.read_csv('/Users/RobertTeresi/Dropbox/'
                                       'CoViD_ED_TF/listofnames.csv')['Name'])
         self.names = [str(x).capitalize() for x in self.names]
@@ -288,6 +306,28 @@ class Entity_Recognizer:
         """Clear list so that names no longer exist."""
         self.entlist = list()
 
+    def encrypt_entlist(self, entlist=None):
+        """Encrypt the entity list."""
+        if entlist:
+            self.entlist = [self.encryptor.encrypt(ent) for ent in entlist]
+        else:
+            self.entlist = [self.encryptor.encrypt(ent)
+                            for ent in self.entlist]
+
+    def decrypt_entlist(self, entlist=None):
+        """Decrypt the entity list.
+
+        Have to pass instance of encrypt class for this to work.
+        Not sure this is the best design.
+        """
+        if entlist:
+            # Decrypt then use decode to switch from bytes to str
+            self.entlist = [self.encryptor.decrypt(ent).decode()
+                            for ent in entlist]
+        else:
+            self.entlist = [self.encryptor.decrypt(ent).decode()
+                            for ent in self.entlist]
+
 
 class WhatsAppAnonymizer(object):
     """Main class that calls other classes and uploads data."""
@@ -306,17 +346,15 @@ class WhatsAppAnonymizer(object):
         self.textparser = TextParser(path=text_path)
         self.textparser.parse_into_texts()
         self.encryptor = Encryptor(key_dir=key_dir)
-        self.anonymizer = Entity_Recognizer()
+        self.anonymizer = Entity_Recognizer(self.encryptor)
 
         # Get entity dict if it exists
         if os.path.exists(self.key_dir /
                           'encrypted_dictionary.pickle'):
             with open((KEY_DIR / 'encryptdict.pickle'), 'rb') as file:
                 self.encryptdict = pickle.load(file)
-                print(self.encryptdict)
             with open((KEY_DIR / 'aliasdict.pickle'), 'rb') as file:
-                aliasdict = pickle.load(file)
-                print(self.aliasdict)
+                self.aliasdict = pickle.load(file)
 
     def encrypt_identities(self):
         """Encrypt the sender."""
@@ -394,6 +432,11 @@ class WhatsAppAnonymizer(object):
 
         with open((KEY_DIR / 'aliasdict.pickle'), 'wb') as file:
             pickle.dump(self.aliasdict, file)
+
+        with open((KEY_DIR / 'entlist.pickle'), 'wb') as file:
+            self.anonymizer.encrypt_entlist()
+            pickle.dump(self.anonymizer.entlist,
+                        file)
 
     def save_options(self):
         """Add to existing data if wanted."""
