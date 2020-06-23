@@ -9,9 +9,11 @@ Parse and anonymize Whatsapp messages
 """
 
 # Import libraries
+import pickle
 import pandas as pd
 import re
 import os
+import sys
 from pathlib import Path
 from datetime import datetime
 import spacy
@@ -22,35 +24,42 @@ from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives import hashes
 from cryptography.hazmat.primitives.asymmetric import padding
 
-# FILE PARAMETERS #
+# FILE PARAMETERS # # # # # #
+#
+# Change your paths to texts
+# and where you want your key
+# and data to be saved.
+#
+# # # # # # # # # # # # # # #
 TEXT_PATH = Path(Path.home() /
                  'Dropbox/CoViD_ED_TF/WhatsApp Chat sample.txt')
-KEY_FOLDER = Path(Path.home() /
-                  'Dropbox/CoViD_ED_TF/Public_Key/')
+KEY_DIR = Path(Path.home() /
+               'Dropbox/CoViD_ED_TF/Public_Key/')
 DATA_DIR = Path(Path.home() /
-                   'Dropbox/CoViD_ED_TF/')
+                'Dropbox/CoViD_ED_TF/')
 
 
+# Class definitions
 class Encryptor(object):
     """
     Generate public key and encrypt identifiers.
 
-    key_folder is where the key will be stored. It should be a PosixPath
+    key_dir is where the key will be stored. It should be a PosixPath
         (made using Path from pathlib).
     """
 
-    def __init__(self, key_folder):
+    def __init__(self, key_dir):
         try:
-            self.load_public_key(key_folder)
+            self.load_public_key(key_dir)
         except Exception:
             try:
-                os.mkdir(key_folder)
+                os.mkdir(key_dir)
             except FileExistsError:
                 pass
-            self.generate_public_key(key_folder)
-            self.load_public_key(key_folder)
+            self.generate_public_key(key_dir)
+            self.load_public_key(key_dir)
 
-    def generate_keys(self, key_folder):
+    def generate_keys(self, key_dir):
         """
         Generate the public key and store it in a file.
 
@@ -69,7 +78,7 @@ class Encryptor(object):
                 format=serialization.PublicFormat.SubjectPublicKeyInfo
                 )
 
-        with open(Path(key_folder / 'public_key.pem'), 'wb') as file:
+        with open(Path(key_dir / 'public_key.pem'), 'wb') as file:
             file.write(pem)
 
         pem = private_key.private_bytes(
@@ -78,17 +87,17 @@ class Encryptor(object):
                 encryption_algorithm=serialization.NoEncryption()
                 )
 
-        with open(Path(key_folder / 'private_key.pem'), 'wb') as file:
+        with open(Path(key_dir / 'private_key.pem'), 'wb') as file:
             file.write(pem)
 
-    def load_public_key(self, key_folder):
+    def load_public_key(self, key_dir):
         """Attach public key to class from file."""
-        with open(Path(key_folder / 'public_key.pem'), 'rb') as file:
+        with open(Path(key_dir / 'public_key.pem'), 'rb') as file:
             self.public_key = serialization.load_pem_public_key(
                     file.read(),
                     backend=default_backend()
                     )
-        with open(Path(key_folder / 'private_key.pem'), "rb") as file:
+        with open(Path(key_dir / 'private_key.pem'), "rb") as file:
             self.private_key = serialization.load_pem_private_key(
                     file.read(),
                     password=None,
@@ -286,18 +295,28 @@ class WhatsAppAnonymizer(object):
     aliasdict = {}
     encryptdict = {}
 
-    def __init__(self, text_path, key_folder, data_dir):
+    def __init__(self, text_path, key_dir, data_dir):
         """Initialize class."""
         # Initialize paths needed
         self.text_path = text_path
-        self.key_folder = key_folder
+        self.key_dir = key_dir
         self.data_dir = data_dir
 
         # Initialize classes
         self.textparser = TextParser(path=text_path)
         self.textparser.parse_into_texts()
-        self.encryptor = Encryptor(key_folder=key_folder)
+        self.encryptor = Encryptor(key_dir=key_dir)
         self.anonymizer = Entity_Recognizer()
+
+        # Get entity dict if it exists
+        if os.path.exists(self.key_dir /
+                          'encrypted_dictionary.pickle'):
+            with open((KEY_DIR / 'encryptdict.pickle'), 'rb') as file:
+                self.encryptdict = pickle.load(file)
+                print(self.encryptdict)
+            with open((KEY_DIR / 'aliasdict.pickle'), 'rb') as file:
+                aliasdict = pickle.load(file)
+                print(self.aliasdict)
 
     def encrypt_identities(self):
         """Encrypt the sender."""
@@ -338,80 +357,97 @@ class WhatsAppAnonymizer(object):
                 self.textparser.WhatsAppTexts[i].msg = (self.anonymizer.
                                                         anonymize_text(x, j))
 
+    def append_row(self, text):
+        """Append to text dataframe."""
+        self.textdf = self.textdf.append({'sender': text.sender,
+                                          'alias': self.aliasdict[text.sender],
+                                          'msg': text.msg,
+                                          'time': text.time_sent},
+                                         ignore_index=True)
+
     def upload_file(self, append=False):
         """Create dataframe and upload it as a .csv.
-        
+
         This will need some work. As of right not it won't do very well
-        appending texts that were sent at the same time as the last text of 
+        appending texts that were sent at the same time as the last text of
         the last upload. I don't think this is a problem for my current use
         case, but I will add it to the to-do list.
         """
-        def append_row(self,text):
-            textdf.append({'sender': text.sender,
-                           'alias': self.aliasdict[text.sender],
-                           'msg': text.msg,
-                           'time': text.time_sent},
-                          ignore_index=True)
-
-        if append:
-            textdf = self.old_data
-        else:
-            textdf = pd.DataFrame(columns=['sender',
-                                           'alias',
-                                           'msg',
-                                           'time'])
+        def quicktodate(timestr):
+            """Convert datetimes from string back into datetime."""
+            return(datetime.strptime(timestr,  '%Y-%m-%d %H:%M:00'))
 
         for text in self.textparser.WhatsAppTexts:
-            if append & 
-                    (text.time_sent <= self.old_data.iloc[-1]['time']):
+            if append and (text.time_sent <=
+                           quicktodate(self.old_data.iloc[-1]['time'])):
                 continue
             self.create_alias(text.sender)
             print(text.msg)
-            textdf = self.append_row(text)
+            self.append_row(text)
 
-        textdf.to_csv(self.data_dir / 'encrypted_whatsapp_msgs.csv')
+        # Save .csv
+        self.textdf.to_csv(self.data_dir / 'encrypted_whatsapp_msgs.csv')
 
-        def append_file(self):
-            """Add to existing data if wanted."""
-            if os.path.exists(self.data_dir /
-                              'encrypted_whatsapp_msgs.csv'):
-                console_msg = ('You already have encrypted messages saved.\n'
-                               'Enter in 1 to overwrite the existing data\n'
-                               'Enter in 2 to append to the existing data\n'
-                               'Enter in 3 to exit without saving\n\n.')
+        # Save dictionaries
+        with open((KEY_DIR / 'encryptdict.pickle'), 'wb') as file:
+            pickle.dump(self.encryptdict, file)
+
+        with open((KEY_DIR / 'aliasdict.pickle'), 'wb') as file:
+            pickle.dump(self.aliasdict, file)
+
+    def save_options(self):
+        """Add to existing data if wanted."""
+        self.textdf = pd.DataFrame(columns=['sender',
+                                            'alias',
+                                            'msg',
+                                            'time'])
+        if os.path.exists(self.data_dir /
+                          'encrypted_whatsapp_msgs.csv'):
+            console_msg = ('You already have encrypted messages saved.\n'
+                           'Enter in 1 to overwrite the existing data\n'
+                           'Enter in 2 to append to the existing data\n'
+                           'Enter in 3 to exit without saving\n\n.')
+            print('\n\n' + console_msg)
+            response = int(input())
+            count = 0
+            while response not in [1, 2, 3]:
+                if count > 2:
+                    print('\nRetries exceeded--script closing. '
+                          'Please report this if it is an error.')
+                    sys.exit()
+                print("It seems you have entered in an incorrect input.")
                 print(console_msg)
                 response = int(input())
-                count = 0
-                while response not in [1, 2, 3]:
-                    if count > 2:
-                        print('Retries exceeded--script closing. '
-                              'Please report this if it is an error.')
-                        exit()
-                    print("It seems you have entered in an incorrect input.")
-                    print(console_msg)
-                    response = int(input())
 
-                if response == 3:
-                    exit()  # Exit the script without saving
+            if response == 3:
+                sys.exit()  # Exit the script without saving
 
-                elif response == 2:
-                    self.old_data = pd.read_csv(self.data_dir /
-                                                'encrypted_whatsapp_msgs.csv')
-                    self.upload_file(append=True)
-                else:
-                    # Overwrite by uploading_file directly
-                    self.upload_file()
-            else:
-                self.upload_file()
+            elif response == 2:
+                self.old_data = pd.read_csv(self.data_dir /
+                                            'encrypted_whatsapp_msgs.csv')
+                self.textdf = self.old_data
+                self.upload_file(append=True)
+                return(None)
+            elif response == 1:
+                print('You selected to overwrite your data. '
+                      'Press 1 if you are sure you want to do this.\n'
+                      'Press any other key to cancel.')
+                confirmation = input()
+                if confirmation != "1":
+                    print('\n Cancelling script.')
+                    sys.exit()
+
+        # Upload file normally if no existing file or 1 (overwrite) chosen
+        self.upload_file()
 
 
 def main():
     """Control execution of class functions."""
     global anonymizer
-    anonymizer = WhatsAppAnonymizer(TEXT_PATH, KEY_FOLDER, DATA_DIR)
+    anonymizer = WhatsAppAnonymizer(TEXT_PATH, KEY_DIR, DATA_DIR)
     anonymizer.encrypt_identities()
     anonymizer.anonymize_text_bodies()
-    anonymizer.append_file()
+    anonymizer.save_options()
 
 
 if __name__ == '__main__':
