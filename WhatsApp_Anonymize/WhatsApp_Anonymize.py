@@ -416,7 +416,7 @@ class WhatsAppAnonymizer(object):
             return(datetime.strptime(timestr,  '%Y-%m-%d %H:%M:00'))
 
         for text in self.textparser.WhatsAppTexts:
-            if append and (text.time_sent <=
+            if append and (text.time_sent <
                            quicktodate(self.old_data.iloc[-1]['time'])):
                 continue
             self.create_alias(text.sender)
